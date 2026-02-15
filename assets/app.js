@@ -520,3 +520,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Failed to initialize app:', err);
         });
 });
+
+// PWA: register the service worker (served at /sw.js so it can control navigation).
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+            console.warn('Service worker registration failed:', err);
+        });
+    });
+}

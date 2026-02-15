@@ -13,3 +13,6 @@ venv/
 
 # Optional local input PDFs (keep out of git by default)
 pdfs/
+
+# Local icon drop (source lives in assets/icon-source.png)
+/icon-512.png

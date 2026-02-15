@@ -21,6 +21,18 @@ app = Flask(__name__)
 def index():
     return send_from_directory(BASE_DIR / "templates", "index.html")
 
+@app.route("/manifest.webmanifest")
+def manifest():
+    # Serve from repo root so static hosts (e.g. Netlify publishing ".") and
+    # this Flask app behave the same.
+    return send_from_directory(BASE_DIR, "manifest.webmanifest", mimetype="application/manifest+json")
+
+
+@app.route("/sw.js")
+def service_worker():
+    # Must be at origin root (or a directory above the app) to control navigation.
+    return send_from_directory(BASE_DIR, "sw.js", mimetype="text/javascript")
+
 
 @app.route("/assets/<path:filename>")
 def assets(filename: str):
@@ -43,4 +55,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

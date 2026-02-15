@@ -37,3 +37,20 @@ python3 app.py
 Then open:
 
 - `http://127.0.0.1:5003`
+
+## PWA (Installable App)
+
+This repo was not a PWA originally (no web app manifest / service worker). It now includes:
+
+- `manifest.webmanifest`
+- `sw.js`
+
+To set the app icon, save your source image to:
+
+- `assets/icon-source.png`
+
+Then generate the required sizes (macOS):
+
+```bash
+./scripts/generate_pwa_icons.sh
+```
