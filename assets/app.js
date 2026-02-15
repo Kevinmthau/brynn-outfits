@@ -235,11 +235,162 @@ function renderAllItems() {
 // Navigation + Filters
 // =============================================================================
 
-function backToCollection() {
+function getRouteFromHash() {
+    const hash = window.location.hash || '';
+    const query = hash.startsWith('#') ? hash.slice(1) : hash;
+    const params = new URLSearchParams(query);
+
+    // Prefer "page" if both are present.
+    const page = params.get('page');
+    if (page) return { view: 'page', prefixedPageName: page };
+
+    const item = params.get('item');
+    if (item) return { view: 'item', itemName: item };
+
+    return { view: 'all' };
+}
+
+function routeToHash(route) {
+    if (!route || route.view === 'all') return '';
+    const params = new URLSearchParams();
+    if (route.view === 'item' && route.itemName) params.set('item', route.itemName);
+    if (route.view === 'page' && route.prefixedPageName) params.set('page', route.prefixedPageName);
+    const qs = params.toString();
+    return qs ? `#${qs}` : '';
+}
+
+function renderAllView() {
     document.getElementById('item-view').classList.add('hidden');
     document.getElementById('page-view').classList.add('hidden');
     document.getElementById('all-view').classList.remove('hidden');
     document.title = "Brynn's Outfit Finder";
+}
+
+function renderItemDetail(itemName) {
+    if (!DATA_READY) return;
+    const pages = clothingIndex[itemName];
+    if (!pages || !pages.length) return;
+
+    document.getElementById('all-view').classList.add('hidden');
+    document.getElementById('page-view').classList.add('hidden');
+    document.getElementById('item-view').classList.remove('hidden');
+
+    document.title = itemName + " - Brynn's Outfit Finder";
+
+    const content = document.getElementById('item-detail-content');
+    content.innerHTML = `
+        <div class="page-images">
+            ${pages.map(prefixedPage => {
+                const { source, page } = parsePrefixedPage(prefixedPage);
+                const imageFolder = getImageFolder(prefixedPage);
+                const displayPage = page.replace('page_', 'Page ');
+                const label = sourceLabel(source);
+                const caption = escapeForInline(label + ' - ' + displayPage + ' - ' + itemName);
+
+                return `
+                <div class="page-card">
+                    <img src="${imageFolder}/${page}.jpg"
+                         alt="${escapeForInline(label + ' - ' + displayPage)}"
+                         class="clickable-image"
+                         loading="lazy"
+                         onclick="openModal('${imageFolder}/${page}.jpg', '${caption}')"
+                         onerror="this.parentElement.style.display='none';">
+                    <div class="page-title" onclick="showPageDetail('${escapeForInline(prefixedPage)}')" style="cursor: pointer;">
+                        ${label} - ${displayPage}
+                    </div>
+                </div>
+            `}).join('')}
+        </div>
+    `;
+}
+
+function renderPageDetail(prefixedPageName) {
+    if (!DATA_READY) return;
+    const items = pageItems[prefixedPageName];
+    if (!items) return;
+
+    const { source, page } = parsePrefixedPage(prefixedPageName);
+    const imageFolder = getImageFolder(prefixedPageName);
+    const displayPage = page.replace('page_', 'Page ');
+    const label = sourceLabel(source);
+
+    document.getElementById('all-view').classList.add('hidden');
+    document.getElementById('item-view').classList.add('hidden');
+    document.getElementById('page-view').classList.remove('hidden');
+    document.title = `${label} - ${displayPage} - Brynn's Outfit Finder`;
+
+    const itemsList = Array.isArray(items)
+        ? items.map(item => {
+            if (item && typeof item === 'object') {
+                return `
+                    <a onclick="showItemDetail('${escapeForInline(item.name)}')" class="item-link">
+                        ${item.name} <span style="color: #7f8c8d; font-size: 0.9em;">[${item.category}]</span>
+                    </a>`;
+            }
+            // Legacy string fallback
+            return `
+                <a onclick="showItemDetail('${escapeForInline(item)}')" class="item-link">
+                    ${item}
+                </a>`;
+        }).join('')
+        : '';
+
+    const content = document.getElementById('page-detail-content');
+    content.innerHTML = `
+        <div class="page-detail">
+            <div class="page-image">
+                <img src="${imageFolder}/${page}.jpg" alt="${escapeForInline(label + ' - ' + displayPage)}"
+                     class="clickable-image"
+                     loading="lazy"
+                     style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"
+                     onclick="openModal('${imageFolder}/${page}.jpg', '${escapeForInline(label + ' - ' + displayPage)}')">
+            </div>
+            <div class="page-items">
+                <h3>Clothing items on this page:</h3>
+                <div class="item-list">
+                    ${itemsList}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderRoute(route) {
+    if (!route) return renderAllView();
+    if (route.view === 'item') return renderItemDetail(route.itemName);
+    if (route.view === 'page') return renderPageDetail(route.prefixedPageName);
+    return renderAllView();
+}
+
+function renderFromLocation() {
+    if (!DATA_READY) return;
+    renderRoute(getRouteFromHash());
+}
+
+function navigateTo(route, { replace = false } = {}) {
+    const url = new URL(window.location.href);
+    url.hash = routeToHash(route);
+    const state = { __brynn_outfits: true };
+
+    if (replace) {
+        history.replaceState(state, '', url);
+    } else {
+        history.pushState(state, '', url);
+    }
+
+    renderRoute(route);
+}
+
+function backToCollection() {
+    // Prefer actual browser back to keep the history stack consistent.
+    // If this history entry wasn't created by our in-app navigation (e.g. a deep link
+    // opened directly to an item/page), fall back to navigating to the collection view
+    // instead of potentially leaving the app.
+    if (history.state && history.state.__brynn_outfits && history.length > 1) {
+        history.back();
+        return;
+    }
+    navigateTo({ view: 'all' });
 }
 
 function filterByCategory(category) {
@@ -316,99 +467,29 @@ function filterItems(collection) {
 // =============================================================================
 
 function showItemDetail(itemName) {
-    if (!DATA_READY) return;
-    const pages = clothingIndex[itemName];
-    if (!pages || !pages.length) return;
-
-    document.getElementById('all-view').classList.add('hidden');
-    document.getElementById('page-view').classList.add('hidden');
-    document.getElementById('item-view').classList.remove('hidden');
-
-    document.title = itemName + " - Brynn's Outfit Finder";
-
-    const content = document.getElementById('item-detail-content');
-    content.innerHTML = `
-        <div class="page-images">
-            ${pages.map(prefixedPage => {
-                const { source, page } = parsePrefixedPage(prefixedPage);
-                const imageFolder = getImageFolder(prefixedPage);
-                const displayPage = page.replace('page_', 'Page ');
-                const label = sourceLabel(source);
-                const caption = escapeForInline(label + ' - ' + displayPage + ' - ' + itemName);
-
-                return `
-                <div class="page-card">
-                    <img src="${imageFolder}/${page}.jpg"
-                         alt="${escapeForInline(label + ' - ' + displayPage)}"
-                         class="clickable-image"
-                         loading="lazy"
-                         onclick="openModal('${imageFolder}/${page}.jpg', '${caption}')"
-                         onerror="this.parentElement.style.display='none';">
-                    <div class="page-title" onclick="showPageDetail('${escapeForInline(prefixedPage)}')" style="cursor: pointer;">
-                        ${label} - ${displayPage}
-                    </div>
-                </div>
-            `}).join('')}
-        </div>
-    `;
+    navigateTo({ view: 'item', itemName });
 }
 
 function showPageDetail(prefixedPageName) {
-    if (!DATA_READY) return;
-    const items = pageItems[prefixedPageName];
-    if (!items) return;
-
-    const { source, page } = parsePrefixedPage(prefixedPageName);
-    const imageFolder = getImageFolder(prefixedPageName);
-    const displayPage = page.replace('page_', 'Page ');
-    const label = sourceLabel(source);
-
-    document.getElementById('all-view').classList.add('hidden');
-    document.getElementById('item-view').classList.add('hidden');
-    document.getElementById('page-view').classList.remove('hidden');
-    document.title = `${label} - ${displayPage} - Brynn's Outfit Finder`;
-
-    const itemsList = Array.isArray(items)
-        ? items.map(item => {
-            if (item && typeof item === 'object') {
-                return `
-                    <a onclick="showItemDetail('${escapeForInline(item.name)}')" class="item-link">
-                        ${item.name} <span style="color: #7f8c8d; font-size: 0.9em;">[${item.category}]</span>
-                    </a>`;
-            }
-            // Legacy string fallback
-            return `
-                <a onclick="showItemDetail('${escapeForInline(item)}')" class="item-link">
-                    ${item}
-                </a>`;
-        }).join('')
-        : '';
-
-    const content = document.getElementById('page-detail-content');
-    content.innerHTML = `
-        <div class="page-detail">
-            <div class="page-image">
-                <img src="${imageFolder}/${page}.jpg" alt="${escapeForInline(label + ' - ' + displayPage)}"
-                     class="clickable-image"
-                     loading="lazy"
-                     style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"
-                     onclick="openModal('${imageFolder}/${page}.jpg', '${escapeForInline(label + ' - ' + displayPage)}')">
-            </div>
-            <div class="page-items">
-                <h3>Clothing items on this page:</h3>
-                <div class="item-list">
-                    ${itemsList}
-                </div>
-            </div>
-        </div>
-    `;
+    navigateTo({ view: 'page', prefixedPageName });
 }
 
 // =============================================================================
 // Modal
 // =============================================================================
 
-function openModal(imageSrc, caption) {
+function openModal(imageSrc, caption, pushModalHistory = true) {
+    // Add a history entry so the browser back button closes the modal first.
+    // Keep the URL the same; modal identity lives in the history state.
+    if (pushModalHistory) {
+        const current = history.state && typeof history.state === 'object' ? history.state : {};
+        history.pushState(
+            { ...current, __brynn_outfits: true, modal: true, modalImageSrc: imageSrc, modalCaption: caption },
+            '',
+            window.location.href
+        );
+    }
+
     const modal = document.getElementById('imageModal');
     const modalImg = document.getElementById('modalImage');
     const modalCaption = document.getElementById('modalCaption');
@@ -432,8 +513,13 @@ function openModal(imageSrc, caption) {
     };
 }
 
-function closeModal() {
+function closeModal(fromPopstate = false) {
     document.getElementById('imageModal').style.display = 'none';
+
+    // If this close was user-initiated, pop the modal history entry.
+    if (!fromPopstate && history.state && history.state.modal) {
+        history.back();
+    }
 }
 
 // =============================================================================
@@ -444,39 +530,52 @@ let touchStartX = 0;
 let touchStartY = 0;
 let touchEndX = 0;
 let touchEndY = 0;
+let touchStartTarget = null;
 
 function handleSwipeGesture() {
-    const swipeThreshold = 80;
-    const swipeAngleThreshold = 30;
+    const swipeThreshold = 80; // px
+    const edgeThreshold = 40; // px from left edge to qualify as "back" swipe
+    const anywhereThreshold = 160; // allow stronger swipes that don't start at the edge
 
     const deltaX = touchEndX - touchStartX;
-    const deltaY = Math.abs(touchEndY - touchStartY);
+    const deltaY = touchEndY - touchStartY;
 
     const modal = document.getElementById('imageModal');
     if (modal.style.display === 'block') {
-        const totalDistance = Math.sqrt(deltaX * deltaX + (touchEndY - touchStartY) ** 2);
+        const totalDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
         if (totalDistance > swipeThreshold) closeModal();
         return;
     }
 
-    if (deltaX > swipeThreshold && deltaY < swipeAngleThreshold) {
-        const itemView = document.getElementById('item-view');
-        const pageView = document.getElementById('page-view');
-        if (!itemView.classList.contains('hidden') || !pageView.classList.contains('hidden')) {
-            backToCollection();
-        }
+    // Ignore back-swipe gestures that start on form controls.
+    if (touchStartTarget && touchStartTarget.closest && touchStartTarget.closest('input, textarea, select')) return;
+
+    // Swipe left-to-right to go back (edge swipe to reduce accidental triggers).
+    const mostlyHorizontal = Math.abs(deltaY) <= Math.max(48, Math.abs(deltaX) * 0.5);
+    const itemView = document.getElementById('item-view');
+    const pageView = document.getElementById('page-view');
+    const inDetailView = !itemView.classList.contains('hidden') || !pageView.classList.contains('hidden');
+
+    const qualifiesForBack = (touchStartX <= edgeThreshold && deltaX >= swipeThreshold)
+        || (deltaX >= anywhereThreshold);
+
+    if (inDetailView && qualifiesForBack && mostlyHorizontal) {
+        backToCollection();
     }
 }
 
 function initSwipeNavigation() {
     document.addEventListener('touchstart', function(e) {
-        touchStartX = e.changedTouches[0].screenX;
-        touchStartY = e.changedTouches[0].screenY;
+        if (!e.changedTouches || !e.changedTouches.length) return;
+        touchStartTarget = e.target;
+        touchStartX = e.changedTouches[0].clientX;
+        touchStartY = e.changedTouches[0].clientY;
     }, { passive: true });
 
     document.addEventListener('touchend', function(e) {
-        touchEndX = e.changedTouches[0].screenX;
-        touchEndY = e.changedTouches[0].screenY;
+        if (!e.changedTouches || !e.changedTouches.length) return;
+        touchEndX = e.changedTouches[0].clientX;
+        touchEndY = e.changedTouches[0].clientY;
         handleSwipeGesture();
     }, { passive: true });
 }
@@ -508,6 +607,7 @@ function initAppAfterData() {
     renderAllItems();
     filterByCategory('all');
     filterItems('all');
+    renderFromLocation();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -519,6 +619,21 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(err => {
             console.error('Failed to initialize app:', err);
         });
+});
+
+// Keep in-app views in sync with browser back/forward navigation.
+window.addEventListener('popstate', function(event) {
+    const state = event && event.state && typeof event.state === 'object' ? event.state : null;
+
+    // Modal state takes precedence; underlying route is still derived from the URL hash.
+    if (state && state.modal && state.modalImageSrc) {
+        renderFromLocation();
+        openModal(state.modalImageSrc, state.modalCaption || '', false);
+        return;
+    }
+
+    closeModal(true);
+    renderFromLocation();
 });
 
 // PWA: register the service worker (served at /sw.js so it can control navigation).
