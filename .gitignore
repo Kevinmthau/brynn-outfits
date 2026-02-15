@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Local runtime
+*.log
+
+# Generated assets (large)
+images/
+
+# Optional local input PDFs (keep out of git by default)
+pdfs/
+

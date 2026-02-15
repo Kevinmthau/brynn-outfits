@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="./">
+    <title>Brynn's Outfit Finder</title>
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Brynn Outfits">
+    <meta name="description" content="Browse and discover outfits and clothing items from Brynn's wardrobe PDFs">
+
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-app-data="data/collections.json">
+    <div class="container">
+        <!-- Category tabs are built dynamically from app data -->
+        <div class="category-tabs" id="category-tabs"></div>
+
+        <div class="content">
+            <!-- Collection View (single) -->
+            <div id="all-view">
+                <div class="search-box">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="allSearchInput" placeholder="Search items..." onkeyup="debouncedFilterItems.all()">
+                        <button type="button" class="search-clear" onclick="clearSearch('all')" aria-label="Clear search">&times;</button>
+                    </div>
+                    <div class="search-hint">Supports fuzzy matching</div>
+                </div>
+
+                <div id="all-items-grid"></div>
+                <div id="all-no-results" class="no-results hidden">No matching items found</div>
+            </div>
+
+            <!-- Item Detail View -->
+            <div id="item-view" class="hidden">
+                <a onclick="backToCollection()" class="back-link">&larr; Back</a>
+                <div id="item-detail-content"></div>
+            </div>
+
+            <!-- Page Detail View -->
+            <div id="page-view" class="hidden">
+                <a onclick="backToCollection()" class="back-link">&larr; Back</a>
+                <div id="page-detail-content"></div>
+            </div>
+        </div>
+
+        <!-- Image Modal -->
+        <div id="imageModal" class="modal">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <img class="modal-content" id="modalImage">
+            <div class="modal-caption" id="modalCaption"></div>
+        </div>
+    </div>
+
+    <script src="assets/app.js" defer></script>
+</body>
+</html>
