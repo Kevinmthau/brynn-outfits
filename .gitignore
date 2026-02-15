@@ -11,9 +11,5 @@ venv/
 # Local runtime
 *.log
 
-# Generated assets (large)
-images/
-
 # Optional local input PDFs (keep out of git by default)
 pdfs/
-

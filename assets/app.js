@@ -338,11 +338,11 @@ function showItemDetail(itemName) {
 
                 return `
                 <div class="page-card">
-                    <img src="${imageFolder}/${page}.png"
+                    <img src="${imageFolder}/${page}.jpg"
                          alt="${escapeForInline(label + ' - ' + displayPage)}"
                          class="clickable-image"
                          loading="lazy"
-                         onclick="openModal('${imageFolder}/${page}.png', '${caption}')"
+                         onclick="openModal('${imageFolder}/${page}.jpg', '${caption}')"
                          onerror="this.parentElement.style.display='none';">
                     <div class="page-title" onclick="showPageDetail('${escapeForInline(prefixedPage)}')" style="cursor: pointer;">
                         ${label} - ${displayPage}
@@ -388,11 +388,11 @@ function showPageDetail(prefixedPageName) {
     content.innerHTML = `
         <div class="page-detail">
             <div class="page-image">
-                <img src="${imageFolder}/${page}.png" alt="${escapeForInline(label + ' - ' + displayPage)}"
+                <img src="${imageFolder}/${page}.jpg" alt="${escapeForInline(label + ' - ' + displayPage)}"
                      class="clickable-image"
                      loading="lazy"
                      style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);"
-                     onclick="openModal('${imageFolder}/${page}.png', '${escapeForInline(label + ' - ' + displayPage)}')">
+                     onclick="openModal('${imageFolder}/${page}.jpg', '${escapeForInline(label + ' - ' + displayPage)}')">
             </div>
             <div class="page-items">
                 <h3>Clothing items on this page:</h3>
@@ -520,4 +520,3 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Failed to initialize app:', err);
         });
 });
-

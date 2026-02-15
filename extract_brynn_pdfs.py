@@ -4,7 +4,7 @@ Extract page images + clothing item text from Brynn PDFs.
 
 Input: a directory of PDFs (default: ~/Desktop/brynn-outfits/pdfs)
 Output:
-  - brynn-outfits/images/<source>/page_<n>.png
+  - brynn-outfits/images/<source>/page_<n>.(jpg|png)
   - brynn-outfits/data/collections.json
 
 This avoids OCR: the PDFs already contain selectable text for the item lists.
@@ -257,6 +257,8 @@ def extract_pdf(
     pdf_path: Path,
     source_slug: str,
     scale: float,
+    image_format: str,
+    jpg_quality: int,
     render_images: bool,
     skip_existing_images: bool,
 ) -> Tuple[Dict[str, List[Dict[str, str]]], Dict[str, int]]:
@@ -280,10 +282,13 @@ def extract_pdf(
 
         # Render image
         if render_images:
-            out_path = out_dir / f"page_{page_num}.png"
+            out_path = out_dir / f"page_{page_num}.{image_format}"
             if not (skip_existing_images and out_path.exists()):
                 pix = page.get_pixmap(matrix=mat, alpha=False)
-                pix.save(out_path)
+                if image_format == "jpg":
+                    pix.save(out_path, jpg_quality=jpg_quality)
+                else:
+                    pix.save(out_path)
 
         # Extract item list
         text = page.get_text("text") or ""
@@ -308,13 +313,25 @@ def main() -> None:
     parser.add_argument(
         "--scale",
         type=float,
-        default=3.0,
-        help="Render scale for page images (default: 3.0).",
+        default=2.0,
+        help="Render scale for page images (default: 2.0).",
+    )
+    parser.add_argument(
+        "--image-format",
+        choices=["jpg", "png"],
+        default="jpg",
+        help="Output image format for rendered pages (default: jpg).",
+    )
+    parser.add_argument(
+        "--jpg-quality",
+        type=int,
+        default=85,
+        help="JPEG quality (1-100) when --image-format=jpg (default: 85).",
     )
     parser.add_argument(
         "--no-render",
         action="store_true",
-        help="Skip rendering PNG page images (text extraction only).",
+        help="Skip rendering page images (text extraction only).",
     )
     parser.add_argument(
         "--clean",
@@ -324,7 +341,7 @@ def main() -> None:
     parser.add_argument(
         "--overwrite-images",
         action="store_true",
-        help="Re-render PNGs even if they already exist.",
+        help="Re-render page images even if they already exist.",
     )
     args = parser.parse_args()
 
@@ -368,6 +385,8 @@ def main() -> None:
             pdf_path,
             slug,
             scale=args.scale,
+            image_format=args.image_format,
+            jpg_quality=args.jpg_quality,
             render_images=not args.no_render,
             skip_existing_images=not args.overwrite_images,
         )

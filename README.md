@@ -9,12 +9,12 @@ PDFs are read from (default):
 - `./pdfs` (if you create it)
 - otherwise `~/Desktop/brynn-outfits/pdfs`
 
-The extractor renders each PDF page to PNG and extracts the per-page item list from the PDF's embedded text.
+The extractor renders each PDF page to an image (default: JPG) and extracts the per-page item list from the PDF's embedded text.
 
 ## Extract / Rebuild Data
 
 ```bash
-python3 extract_brynn_pdfs.py --pdf-dir ~/Desktop/brynn-outfits/pdfs --scale 3.0 --clean
+python3 extract_brynn_pdfs.py --pdf-dir ~/Desktop/brynn-outfits/pdfs --scale 2.0 --image-format jpg --jpg-quality 85 --clean
 ```
 
 If images already exist and you only want to rebuild `collections.json`:
@@ -25,7 +25,7 @@ python3 extract_brynn_pdfs.py --pdf-dir ~/Desktop/brynn-outfits/pdfs --no-render
 
 Outputs:
 
-- `brynn-outfits/images/<source>/page_<n>.png`
+- `images/<source>/page_<n>.(jpg|png)`
 - `brynn-outfits/data/collections.json`
 
 ## Run Locally
