@@ -54,15 +54,24 @@ function getCategoryOrder() {
     return CATEGORY_ORDER.all || CATEGORY_ORDER.summer || [];
 }
 
-function buildItemCategoryLookup(itemsByPage) {
+function buildItemMetadataLookup(itemsByPage) {
     const lookup = {};
     Object.values(itemsByPage || {}).forEach(items => {
         if (!Array.isArray(items)) return;
-        items.forEach(item => {
-            if (item && typeof item === 'object') {
-                if (item.name && item.category && !lookup[item.name]) {
-                    lookup[item.name] = item.category;
-                }
+        items.forEach(entry => {
+            const normalized = normalizeItemEntry(entry);
+            if (!normalized.name) return;
+
+            if (!lookup[normalized.name]) {
+                lookup[normalized.name] = {
+                    category: normalized.category || 'Other',
+                    trashed: Boolean(normalized.trashed)
+                };
+                return;
+            }
+
+            if (normalized.trashed) {
+                lookup[normalized.name].trashed = true;
             }
         });
     });
@@ -75,23 +84,27 @@ function categorizeItemsForRender(index, itemsByPage) {
     const categorized = {};
     order.forEach(cat => { categorized[cat] = []; });
 
-    const itemCategoryLookup = buildItemCategoryLookup(itemsByPage);
+    const itemMetadataLookup = buildItemMetadataLookup(itemsByPage);
 
     Object.keys(index || {}).forEach(itemName => {
         const pages = index[itemName] || [];
-        let category = itemCategoryLookup[itemName] || 'Other';
+        const metadata = itemMetadataLookup[itemName] || { category: 'Other', trashed: false };
+        let category = metadata.category || 'Other';
         if (!categoriesSet.has(category)) category = 'Other';
         if (!categorized[category]) categorized[category] = [];
 
         categorized[category].push({
             name: itemName,
             pages,
-            category
+            category,
+            trashed: Boolean(metadata.trashed)
         });
     });
 
     Object.keys(categorized).forEach(cat => {
         categorized[cat].sort((a, b) => {
+            const trashDiff = Number(Boolean(a.trashed)) - Number(Boolean(b.trashed));
+            if (trashDiff !== 0) return trashDiff;
             const countDiff = (b.pages?.length || 0) - (a.pages?.length || 0);
             if (countDiff !== 0) return countDiff;
             return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
@@ -105,18 +118,20 @@ function normalizeItemEntry(entry) {
     if (entry && typeof entry === 'object') {
         return {
             name: String(entry.name || '').trim(),
-            category: String(entry.category || 'Other').trim() || 'Other'
+            category: String(entry.category || 'Other').trim() || 'Other',
+            trashed: Boolean(entry.trashed)
         };
     }
 
     if (typeof entry === 'string') {
         return {
             name: entry.trim(),
-            category: 'Other'
+            category: 'Other',
+            trashed: false
         };
     }
 
-    return { name: '', category: 'Other' };
+    return { name: '', category: 'Other', trashed: false };
 }
 
 function getEditableCategories() {
@@ -142,8 +157,13 @@ function getEditableCategories() {
 }
 
 function getItemCategory(itemName) {
-    const lookup = buildItemCategoryLookup(pageItems);
-    return lookup[itemName] || 'Other';
+    const lookup = buildItemMetadataLookup(pageItems);
+    return lookup[itemName]?.category || 'Other';
+}
+
+function isItemTrashed(itemName) {
+    const lookup = buildItemMetadataLookup(pageItems);
+    return Boolean(lookup[itemName]?.trashed);
 }
 
 function getApiDataUrl() {
@@ -291,11 +311,13 @@ function renderAllItems() {
             const escapedCategory = escapeForInline(item.category || 'Other');
             const pagesCount = item.pages?.length || 0;
             const pageLabel = pagesCount === 1 ? 'page' : 'pages';
+            const trashed = Boolean(item.trashed);
+            const trashIndicator = trashed ? ' <span class="item-trash-indicator" aria-hidden="true">🗑️</span>' : '';
 
             html += `
-                            <div class="item-card" data-item-name="${escapeForInline(item.name)}" data-item-category="${escapedCategory}" onclick="onItemCardClick('${escapedName}')">
-                                <button type="button" class="edit-btn" onclick="event.stopPropagation(); openEditItemModal('${escapedName}', '${escapedCategory}')" aria-label="Edit item">✎</button>
-                                <div class="item-name">${item.name}</div>
+                            <div class="item-card" data-item-name="${escapeForInline(item.name)}" data-item-category="${escapedCategory}" data-item-trashed="${trashed ? '1' : '0'}" onclick="onItemCardClick('${escapedName}')">
+                                <button type="button" class="edit-btn" onclick="event.stopPropagation(); openEditItemModal('${escapedName}', '${escapedCategory}', ${trashed ? 'true' : 'false'})" aria-label="Edit item">✎</button>
+                                <div class="item-name">${item.name}${trashIndicator}</div>
                                 <div class="item-count">
                                     Appears on ${pagesCount} ${pageLabel}
                                 </div>
@@ -567,19 +589,20 @@ function toggleEditMode() {
 
 function onItemCardClick(itemName) {
     if (EDIT_MODE) {
-        openEditItemModal(itemName, getItemCategory(itemName));
+        openEditItemModal(itemName, getItemCategory(itemName), isItemTrashed(itemName));
         return;
     }
     showItemDetail(itemName);
 }
 
-function openEditItemModal(itemName, currentCategory) {
+function openEditItemModal(itemName, currentCategory, currentTrashed = false) {
     if (!DATA_READY) return;
 
     const modal = document.getElementById('editItemModal');
     const nameInput = document.getElementById('editItemNameInput');
     const categorySelect = document.getElementById('editItemCategorySelect');
-    if (!modal || !nameInput || !categorySelect) return;
+    const trashedCheckbox = document.getElementById('editItemTrashedCheckbox');
+    if (!modal || !nameInput || !categorySelect || !trashedCheckbox) return;
 
     ACTIVE_EDIT_ITEM_NAME = itemName;
     nameInput.value = itemName;
@@ -593,6 +616,7 @@ function openEditItemModal(itemName, currentCategory) {
         .map(cat => `<option value="${escapeForInline(cat)}">${cat}</option>`)
         .join('');
     categorySelect.value = currentCategory || 'Other';
+    trashedCheckbox.checked = Boolean(currentTrashed);
 
     modal.classList.remove('hidden');
     nameInput.focus();
@@ -622,7 +646,7 @@ function showToast(message, type = 'success') {
     }, 2200);
 }
 
-function renameAndRecategorizeItem(oldName, newName, newCategory) {
+function renameAndRecategorizeItem(oldName, newName, newCategory, newTrashed) {
     const oldPages = Array.isArray(clothingIndex[oldName]) ? clothingIndex[oldName] : [];
     const existingNewPages = Array.isArray(clothingIndex[newName]) ? clothingIndex[newName] : [];
     clothingIndex[newName] = Array.from(new Set([...existingNewPages, ...oldPages]));
@@ -641,20 +665,34 @@ function renameAndRecategorizeItem(oldName, newName, newCategory) {
 
             let name = normalized.name;
             let category = normalized.category || 'Other';
+            let trashed = Boolean(normalized.trashed);
             const isTarget = name === oldName || (oldName !== newName && name === newName);
 
             if (isTarget) {
                 name = newName;
                 category = newCategory;
+                trashed = Boolean(newTrashed);
             }
 
             if (seen.has(name)) {
                 const idx = seen.get(name);
-                if (name === newName) merged[idx].category = newCategory;
+                if (name === newName) {
+                    merged[idx].category = newCategory;
+                    if (newTrashed) {
+                        merged[idx].trashed = true;
+                    } else {
+                        delete merged[idx].trashed;
+                    }
+                } else if (trashed) {
+                    merged[idx].trashed = true;
+                }
                 return;
             }
 
             const next = { name, category };
+            if (trashed) {
+                next.trashed = true;
+            }
             seen.set(name, merged.length);
             merged.push(next);
         });
@@ -727,14 +765,16 @@ function rerenderCollectionView() {
 async function saveEditItem() {
     const nameInput = document.getElementById('editItemNameInput');
     const categorySelect = document.getElementById('editItemCategorySelect');
+    const trashedCheckbox = document.getElementById('editItemTrashedCheckbox');
     const saveButton = document.getElementById('editItemSaveButton');
-    if (!nameInput || !categorySelect || !saveButton) return;
+    if (!nameInput || !categorySelect || !trashedCheckbox || !saveButton) return;
 
     const oldName = ACTIVE_EDIT_ITEM_NAME;
     if (!oldName) return;
 
     const newName = nameInput.value.trim();
     const newCategory = categorySelect.value.trim() || 'Other';
+    const newTrashed = Boolean(trashedCheckbox.checked);
 
     if (!newName) {
         showToast('Item name cannot be empty.', 'error');
@@ -754,7 +794,7 @@ async function saveEditItem() {
     saveButton.textContent = 'Saving...';
 
     try {
-        renameAndRecategorizeItem(oldName, newName, newCategory);
+        renameAndRecategorizeItem(oldName, newName, newCategory, newTrashed);
         rerenderCollectionView();
 
         const savedData = await persistAppData(buildPersistedDataPayload());

@@ -359,6 +359,11 @@ body {
     overflow: hidden;
 }
 
+.item-trash-indicator {
+    display: inline-block;
+    margin-left: 4px;
+}
+
 .item-count {
     color: var(--text-muted);
     font-size: 0.75rem;
@@ -633,7 +638,7 @@ body.edit-mode .item-card {
     font-weight: 600;
 }
 
-.edit-item-panel input,
+.edit-item-panel input[type="text"],
 .edit-item-panel select {
     width: 100%;
     border: 1px solid var(--border);
@@ -645,10 +650,32 @@ body.edit-mode .item-card {
     outline: none;
 }
 
-.edit-item-panel input:focus,
+.edit-item-panel input[type="text"]:focus,
 .edit-item-panel select:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
+}
+
+.edit-item-panel .edit-item-trash-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    margin-bottom: 2px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.edit-item-panel .edit-item-trash-toggle input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.edit-item-panel .edit-item-trash-toggle span {
+    font-size: 0.92rem;
+    font-weight: 600;
 }
 
 .edit-item-actions {
