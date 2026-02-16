@@ -182,6 +182,10 @@ def categorize_item(item_text: str) -> str:
         return tokens[-n:] == phrase
 
     tokens = tokenize(item_text)
+    # Always classify V-neck items as sweaters.
+    if "vneck" in tokens or contains_phrase(tokens, ["v", "neck"]):
+        return "Sweaters"
+
     # In this dataset, "mini" / "midi" / "pencil" are used as shorthand for
     # skirt silhouettes; treat them as explicit overrides so these items are
     # grouped under Skirts.
