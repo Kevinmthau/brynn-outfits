@@ -360,8 +360,15 @@ body {
 }
 
 .item-trash-indicator {
-    display: inline-block;
-    margin-left: 4px;
+    position: absolute;
+    right: 12px;
+    bottom: 10px;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.item-card[data-item-trashed="1"] .item-count {
+    padding-right: 20px;
 }
 
 .item-count {

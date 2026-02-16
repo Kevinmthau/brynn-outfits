@@ -312,15 +312,16 @@ function renderAllItems() {
             const pagesCount = item.pages?.length || 0;
             const pageLabel = pagesCount === 1 ? 'page' : 'pages';
             const trashed = Boolean(item.trashed);
-            const trashIndicator = trashed ? ' <span class="item-trash-indicator" aria-hidden="true">🗑️</span>' : '';
+            const trashIndicator = trashed ? '<span class="item-trash-indicator" aria-hidden="true">🗑️</span>' : '';
 
             html += `
                             <div class="item-card" data-item-name="${escapeForInline(item.name)}" data-item-category="${escapedCategory}" data-item-trashed="${trashed ? '1' : '0'}" onclick="onItemCardClick('${escapedName}')">
                                 <button type="button" class="edit-btn" onclick="event.stopPropagation(); openEditItemModal('${escapedName}', '${escapedCategory}', ${trashed ? 'true' : 'false'})" aria-label="Edit item">✎</button>
-                                <div class="item-name">${item.name}${trashIndicator}</div>
+                                <div class="item-name">${item.name}</div>
                                 <div class="item-count">
                                     Appears on ${pagesCount} ${pageLabel}
                                 </div>
+                                ${trashIndicator}
                             </div>`;
         });
 
