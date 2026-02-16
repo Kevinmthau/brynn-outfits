@@ -581,11 +581,84 @@ function updateEditModeButton() {
     button.textContent = EDIT_MODE ? 'Done' : 'Edit';
 }
 
+function withImmediateScroll(updateScroll) {
+    const root = document.documentElement;
+    const previousScrollBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = 'auto';
+    try {
+        updateScroll();
+    } finally {
+        root.style.scrollBehavior = previousScrollBehavior;
+    }
+}
+
+function captureAllViewScrollAnchor() {
+    const allView = document.getElementById('all-view');
+    const grid = document.getElementById('all-items-grid');
+    if (!allView || allView.classList.contains('hidden') || !grid) {
+        return { scrollY: window.scrollY, itemName: '', top: 0 };
+    }
+
+    const cards = grid.querySelectorAll('.item-card');
+    let anchorCard = null;
+    let anchorTop = Number.POSITIVE_INFINITY;
+
+    cards.forEach(card => {
+        if (card.offsetParent === null) return;
+        const rect = card.getBoundingClientRect();
+        if (rect.bottom <= 0) return;
+        if (rect.top < anchorTop) {
+            anchorCard = card;
+            anchorTop = rect.top;
+        }
+    });
+
+    return {
+        scrollY: window.scrollY,
+        itemName: anchorCard ? (anchorCard.getAttribute('data-item-name') || '') : '',
+        top: anchorCard ? anchorCard.getBoundingClientRect().top : 0
+    };
+}
+
+function restoreAllViewScrollAnchor(anchor) {
+    if (!anchor) return;
+
+    const allView = document.getElementById('all-view');
+    const grid = document.getElementById('all-items-grid');
+    if (!allView || allView.classList.contains('hidden') || !grid) return;
+
+    let targetCard = null;
+    if (anchor.itemName) {
+        const cards = grid.querySelectorAll('.item-card');
+        for (const card of cards) {
+            if (card.offsetParent === null) continue;
+            if ((card.getAttribute('data-item-name') || '') === anchor.itemName) {
+                targetCard = card;
+                break;
+            }
+        }
+    }
+
+    if (targetCard) {
+        const deltaY = targetCard.getBoundingClientRect().top - anchor.top;
+        if (Math.abs(deltaY) > 1) {
+            withImmediateScroll(() => window.scrollBy(0, deltaY));
+        }
+        return;
+    }
+
+    if (Math.abs(window.scrollY - anchor.scrollY) > 1) {
+        withImmediateScroll(() => window.scrollTo(0, anchor.scrollY));
+    }
+}
+
 function toggleEditMode() {
+    const scrollAnchor = captureAllViewScrollAnchor();
     EDIT_MODE = !EDIT_MODE;
     document.body.classList.toggle('edit-mode', EDIT_MODE);
     updateEditModeButton();
     if (!EDIT_MODE) closeEditItemModal();
+    requestAnimationFrame(() => restoreAllViewScrollAnchor(scrollAnchor));
 }
 
 function onItemCardClick(itemName) {
