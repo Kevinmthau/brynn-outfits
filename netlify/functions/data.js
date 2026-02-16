@@ -1,6 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { getStore } = require('@netlify/blobs');
+const { connectLambda, getStore } = require('@netlify/blobs');
 
 const STORE_NAME = 'brynn-outfits';
 const STORE_KEY = 'collections.json';
@@ -50,9 +50,14 @@ async function loadBundledDefaultData(event) {
 }
 
 async function loadStoredData(event) {
-    const store = getStore({ name: STORE_NAME });
-
     try {
+        try {
+            connectLambda(event);
+        } catch (error) {
+            // Ignore when lambda blobs context is not attached to the event.
+        }
+
+        const store = getStore({ name: STORE_NAME });
         const stored = await store.get(STORE_KEY, { type: 'text' });
         if (stored) {
             return JSON.parse(stored);
@@ -64,7 +69,13 @@ async function loadStoredData(event) {
     return loadBundledDefaultData(event);
 }
 
-async function saveStoredData(payload) {
+async function saveStoredData(event, payload) {
+    try {
+        connectLambda(event);
+    } catch (error) {
+        // Ignore when lambda blobs context is not attached to the event.
+    }
+
     const store = getStore({ name: STORE_NAME });
     await store.set(STORE_KEY, JSON.stringify(payload));
 }
@@ -96,6 +107,7 @@ exports.handler = async (event) => {
             const data = await loadStoredData(event);
             return jsonResponse(200, data);
         } catch (error) {
+            console.error('Failed to load collections data:', error);
             return jsonResponse(500, { error: 'Failed to load collections data.' });
         }
     }
@@ -123,9 +135,10 @@ exports.handler = async (event) => {
         }
 
         try {
-            await saveStoredData(payload);
+            await saveStoredData(event, payload);
             return jsonResponse(200, { ok: true, data: payload });
         } catch (error) {
+            console.error('Failed to persist collections data:', error);
             return jsonResponse(500, { error: 'Failed to persist collections data.' });
         }
     }
