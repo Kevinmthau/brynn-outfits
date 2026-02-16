@@ -248,14 +248,21 @@ function buildCategoryTabs() {
     // Always include All first; avoid double-adding if order already contains it.
     const cats = ['all', ...order.filter(c => c && c !== 'all')];
 
-    container.innerHTML = cats.map(cat => {
+    const categoryTabsHtml = cats.map(cat => {
         if (cat === 'all') {
-            return `<button onclick="filterByCategory('all')" class="active" id="cat-all" title="All">All</button>`;
+            return `<button data-category-tab="1" onclick="filterByCategory('all')" class="active" id="cat-all" title="All">All</button>`;
         }
         const icon = CATEGORY_ICONS[cat] || '';
         const title = cat;
-        return `<button onclick="filterByCategory('${escapeForInline(cat)}')" id="cat-${escapeForInline(cat)}" title="${escapeForInline(title)}">${icon || cat}</button>`;
+        return `<button data-category-tab="1" onclick="filterByCategory('${escapeForInline(cat)}')" id="cat-${escapeForInline(cat)}" title="${escapeForInline(title)}">${icon || cat}</button>`;
     }).join('');
+
+    const editLabel = EDIT_MODE ? 'Done' : 'Edit';
+    const editPressed = EDIT_MODE ? 'true' : 'false';
+    const editActiveClass = EDIT_MODE ? ' active' : '';
+    const editButtonHtml = `<button type="button" id="edit-mode-toggle" class="edit-mode-btn${editActiveClass}" aria-pressed="${editPressed}" onclick="toggleEditMode()">${editLabel}</button>`;
+
+    container.innerHTML = `${categoryTabsHtml}${editButtonHtml}`;
 }
 
 function renderAllItems() {
@@ -474,7 +481,7 @@ function filterByCategory(category) {
     currentCategory = category;
 
     // Update active tab
-    document.querySelectorAll('.category-tabs button').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.category-tabs button[data-category-tab="1"]').forEach(btn => btn.classList.remove('active'));
     const activeBtn = document.getElementById('cat-' + category);
     if (activeBtn) activeBtn.classList.add('active');
 
