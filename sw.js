@@ -1,6 +1,6 @@
 /* Simple service worker to enable installability + basic offline support. */
 
-const CACHE_NAME = "brynn-outfits-static-v2";
+const CACHE_NAME = "brynn-outfits-static-v3";
 
 // Only include files that are guaranteed to exist.
 const PRECACHE_URLS = [
@@ -40,6 +40,26 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(
       fetch(req).catch(() => Response.error())
+    );
+    return;
+  }
+
+  // App code/data should prefer network so UI updates ship immediately.
+  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/data/")) {
+    event.respondWith(
+      (async () => {
+        try {
+          const res = await fetch(req);
+          if (res && res.status === 200) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(req, res.clone());
+          }
+          return res;
+        } catch (_) {
+          const cached = await caches.match(req);
+          return cached || Response.error();
+        }
+      })()
     );
     return;
   }
