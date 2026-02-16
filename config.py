@@ -67,7 +67,7 @@ CATEGORY_KEYWORDS: Dict[str, List[str]] = {
         "shorts", "short",
     ],
     "Sweaters": [
-        "sweater", "sweaters",
+        "sweater", "sweaters", "crew", "crewneck",
     ],
     "Boots": [
         "boot", "boots", "bootie", "booties",
