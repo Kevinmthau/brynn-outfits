@@ -145,14 +145,31 @@ body {
 
 /* Edit Mode Toggle */
 .edit-mode-btn {
-    margin-left: auto;
-    background: var(--bg-elevated) !important;
-    font-size: 0.8rem !important;
+    position: fixed;
+    top: calc(var(--safe-top) + 10px);
+    right: 16px;
+    z-index: 120;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 10px 14px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.edit-mode-btn:active {
+    transform: scale(0.95);
 }
 
 .edit-mode-btn.active {
-    background: var(--success) !important;
-    color: white !important;
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
 }
 
 /* Category Filter Pills */
@@ -164,7 +181,7 @@ body {
     z-index: 99;
     display: flex;
     gap: 8px;
-    padding: 12px 16px;
+    padding: 12px 96px 12px 16px;
     background: var(--bg);
     overflow-x: auto;
     scrollbar-width: none;
@@ -528,9 +545,9 @@ body {
 /* Edit/Delete/Category/Season Buttons */
 .edit-btn, .delete-btn, .category-btn, .season-btn {
     position: absolute;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
     border: none;
     cursor: pointer;
     opacity: 0;
@@ -552,7 +569,7 @@ body.edit-mode .season-btn {
 }
 
 .edit-btn {
-    bottom: 8px;
+    top: 8px;
     right: 8px;
     background: #3498db;
     color: white;
@@ -581,6 +598,95 @@ body.edit-mode .season-btn {
 
 .edit-btn:active, .delete-btn:active, .category-btn:active, .season-btn:active {
     transform: scale(0.9);
+}
+
+body.edit-mode .item-card {
+    padding-top: 52px;
+}
+
+/* Item Edit Modal */
+.edit-item-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1150;
+    background: rgba(8, 8, 12, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.edit-item-panel {
+    width: min(460px, 100%);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow-lg);
+    padding: 18px;
+}
+
+.edit-item-panel h3 {
+    margin: 0 0 14px;
+    font-size: 1.15rem;
+}
+
+.edit-item-panel label {
+    display: block;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.edit-item-panel input,
+.edit-item-panel select {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    padding: 12px;
+    font-size: 0.95rem;
+    outline: none;
+}
+
+.edit-item-panel input:focus,
+.edit-item-panel select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
+}
+
+.edit-item-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.edit-item-actions button {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.edit-item-cancel {
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+.edit-item-save {
+    background: var(--success);
+    border-color: var(--success) !important;
+    color: white;
+}
+
+.edit-item-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* Toast Notifications */
@@ -717,6 +823,7 @@ body.edit-mode .season-btn {
         position: sticky;
         top: var(--nav-height);
         justify-content: center;
+        padding-right: 96px;
     }
 
     .content {

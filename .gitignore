@@ -16,3 +16,6 @@ pdfs/
 
 # Local icon drop (source lives in assets/icon-source.png)
 /icon-512.png
+
+# Node (Netlify functions dependency install)
+node_modules/

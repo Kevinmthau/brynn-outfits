@@ -7,10 +7,16 @@ let SOURCE_IMAGE_PATHS = {};
 let SOURCE_LABELS = {};
 let CATEGORY_ORDER = {};
 let CATEGORY_ICONS = {};
+let APP_DATA = {};
 
 // State
 let currentCategory = 'all';
 let DATA_READY = false;
+let EDIT_MODE = false;
+let ACTIVE_EDIT_ITEM_NAME = null;
+let TOAST_TIMEOUT = null;
+
+const EDIT_KEY_STORAGE_KEY = 'brynn_outfits_edit_key';
 
 // =============================================================================
 // Utilities
@@ -93,6 +99,75 @@ function categorizeItemsForRender(index, itemsByPage) {
     });
 
     return categorized;
+}
+
+function normalizeItemEntry(entry) {
+    if (entry && typeof entry === 'object') {
+        return {
+            name: String(entry.name || '').trim(),
+            category: String(entry.category || 'Other').trim() || 'Other'
+        };
+    }
+
+    if (typeof entry === 'string') {
+        return {
+            name: entry.trim(),
+            category: 'Other'
+        };
+    }
+
+    return { name: '', category: 'Other' };
+}
+
+function getEditableCategories() {
+    const ordered = getCategoryOrder().filter(cat => cat && cat !== 'all');
+    const seen = new Set(ordered);
+
+    Object.values(pageItems || {}).forEach(items => {
+        if (!Array.isArray(items)) return;
+        items.forEach(entry => {
+            const { category } = normalizeItemEntry(entry);
+            if (category && !seen.has(category)) {
+                seen.add(category);
+                ordered.push(category);
+            }
+        });
+    });
+
+    if (!seen.has('Other')) {
+        ordered.push('Other');
+    }
+
+    return ordered;
+}
+
+function getItemCategory(itemName) {
+    const lookup = buildItemCategoryLookup(pageItems);
+    return lookup[itemName] || 'Other';
+}
+
+function getApiDataUrl() {
+    return document.body?.dataset?.apiData || '/api/data';
+}
+
+function getStoredEditKey() {
+    try {
+        return sessionStorage.getItem(EDIT_KEY_STORAGE_KEY) || '';
+    } catch (error) {
+        return '';
+    }
+}
+
+function setStoredEditKey(value) {
+    try {
+        if (value) {
+            sessionStorage.setItem(EDIT_KEY_STORAGE_KEY, value);
+        } else {
+            sessionStorage.removeItem(EDIT_KEY_STORAGE_KEY);
+        }
+    } catch (error) {
+        // Ignore storage errors in private browsing.
+    }
 }
 
 // =============================================================================
@@ -206,11 +281,13 @@ function renderAllItems() {
 
         items.forEach(item => {
             const escapedName = escapeForInline(item.name);
+            const escapedCategory = escapeForInline(item.category || 'Other');
             const pagesCount = item.pages?.length || 0;
             const pageLabel = pagesCount === 1 ? 'page' : 'pages';
 
             html += `
-                            <div class="item-card" data-item-name="${escapeForInline(item.name)}" onclick="showItemDetail('${escapedName}')">
+                            <div class="item-card" data-item-name="${escapeForInline(item.name)}" data-item-category="${escapedCategory}" onclick="onItemCardClick('${escapedName}')">
+                                <button type="button" class="edit-btn" onclick="event.stopPropagation(); openEditItemModal('${escapedName}', '${escapedCategory}')" aria-label="Edit item">✎</button>
                                 <div class="item-name">${item.name}</div>
                                 <div class="item-count">
                                     Appears on ${pagesCount} ${pageLabel}
@@ -463,6 +540,233 @@ function filterItems(collection) {
 }
 
 // =============================================================================
+// Edit Mode + Persistence
+// =============================================================================
+
+function updateEditModeButton() {
+    const button = document.getElementById('edit-mode-toggle');
+    if (!button) return;
+    button.classList.toggle('active', EDIT_MODE);
+    button.setAttribute('aria-pressed', String(EDIT_MODE));
+    button.textContent = EDIT_MODE ? 'Done' : 'Edit';
+}
+
+function toggleEditMode() {
+    EDIT_MODE = !EDIT_MODE;
+    document.body.classList.toggle('edit-mode', EDIT_MODE);
+    updateEditModeButton();
+    if (!EDIT_MODE) closeEditItemModal();
+}
+
+function onItemCardClick(itemName) {
+    if (EDIT_MODE) {
+        openEditItemModal(itemName, getItemCategory(itemName));
+        return;
+    }
+    showItemDetail(itemName);
+}
+
+function openEditItemModal(itemName, currentCategory) {
+    if (!DATA_READY) return;
+
+    const modal = document.getElementById('editItemModal');
+    const nameInput = document.getElementById('editItemNameInput');
+    const categorySelect = document.getElementById('editItemCategorySelect');
+    if (!modal || !nameInput || !categorySelect) return;
+
+    ACTIVE_EDIT_ITEM_NAME = itemName;
+    nameInput.value = itemName;
+
+    const categories = getEditableCategories();
+    if (currentCategory && !categories.includes(currentCategory)) {
+        categories.push(currentCategory);
+    }
+
+    categorySelect.innerHTML = categories
+        .map(cat => `<option value="${escapeForInline(cat)}">${cat}</option>`)
+        .join('');
+    categorySelect.value = currentCategory || 'Other';
+
+    modal.classList.remove('hidden');
+    nameInput.focus();
+    nameInput.select();
+}
+
+function closeEditItemModal() {
+    ACTIVE_EDIT_ITEM_NAME = null;
+    const modal = document.getElementById('editItemModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+}
+
+function showToast(message, type = 'success') {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    if (TOAST_TIMEOUT) clearTimeout(TOAST_TIMEOUT);
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    TOAST_TIMEOUT = setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 280);
+    }, 2200);
+}
+
+function renameAndRecategorizeItem(oldName, newName, newCategory) {
+    const oldPages = Array.isArray(clothingIndex[oldName]) ? clothingIndex[oldName] : [];
+    const existingNewPages = Array.isArray(clothingIndex[newName]) ? clothingIndex[newName] : [];
+    clothingIndex[newName] = Array.from(new Set([...existingNewPages, ...oldPages]));
+    if (oldName !== newName) {
+        delete clothingIndex[oldName];
+    }
+
+    Object.keys(pageItems || {}).forEach(pageKey => {
+        const items = Array.isArray(pageItems[pageKey]) ? pageItems[pageKey] : [];
+        const merged = [];
+        const seen = new Map();
+
+        items.forEach(entry => {
+            const normalized = normalizeItemEntry(entry);
+            if (!normalized.name) return;
+
+            let name = normalized.name;
+            let category = normalized.category || 'Other';
+            const isTarget = name === oldName || (oldName !== newName && name === newName);
+
+            if (isTarget) {
+                name = newName;
+                category = newCategory;
+            }
+
+            if (seen.has(name)) {
+                const idx = seen.get(name);
+                if (name === newName) merged[idx].category = newCategory;
+                return;
+            }
+
+            const next = { name, category };
+            seen.set(name, merged.length);
+            merged.push(next);
+        });
+
+        pageItems[pageKey] = merged;
+    });
+}
+
+function buildPersistedDataPayload() {
+    return {
+        ...APP_DATA,
+        all_index: clothingIndex,
+        all_items: pageItems,
+        source_image_paths: SOURCE_IMAGE_PATHS,
+        source_labels: SOURCE_LABELS,
+        category_order: CATEGORY_ORDER,
+        category_icons: CATEGORY_ICONS,
+        edit_mode_enabled: EDIT_MODE
+    };
+}
+
+async function persistAppData(payload) {
+    const headers = { 'Content-Type': 'application/json' };
+    const storedEditKey = getStoredEditKey();
+    if (storedEditKey) {
+        headers['x-edit-key'] = storedEditKey;
+    }
+
+    const doSave = async () => {
+        const response = await fetch(getApiDataUrl(), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const detail = await response.text().catch(() => '');
+            throw { status: response.status, detail };
+        }
+
+        const result = await response.json().catch(() => ({}));
+        return result?.data || payload;
+    };
+
+    try {
+        return await doSave();
+    } catch (error) {
+        if (error && error.status === 401) {
+            const key = window.prompt('Enter edit key');
+            if (!key || !key.trim()) {
+                throw new Error('Edit key is required to save live changes.');
+            }
+            const trimmed = key.trim();
+            setStoredEditKey(trimmed);
+            headers['x-edit-key'] = trimmed;
+            return doSave();
+        }
+
+        const message = error?.detail ? String(error.detail).slice(0, 200) : 'Unknown error';
+        throw new Error(`Failed to save changes. ${message}`);
+    }
+}
+
+function rerenderCollectionView() {
+    renderAllItems();
+    filterByCategory(currentCategory || 'all');
+    filterItems('all');
+}
+
+async function saveEditItem() {
+    const nameInput = document.getElementById('editItemNameInput');
+    const categorySelect = document.getElementById('editItemCategorySelect');
+    const saveButton = document.getElementById('editItemSaveButton');
+    if (!nameInput || !categorySelect || !saveButton) return;
+
+    const oldName = ACTIVE_EDIT_ITEM_NAME;
+    if (!oldName) return;
+
+    const newName = nameInput.value.trim();
+    const newCategory = categorySelect.value.trim() || 'Other';
+
+    if (!newName) {
+        showToast('Item name cannot be empty.', 'error');
+        return;
+    }
+
+    if (oldName !== newName && clothingIndex[newName]) {
+        const shouldMerge = window.confirm(
+            `"${newName}" already exists. Merge "${oldName}" into "${newName}"?`
+        );
+        if (!shouldMerge) return;
+    }
+
+    const snapshot = JSON.parse(JSON.stringify(buildPersistedDataPayload()));
+
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving...';
+
+    try {
+        renameAndRecategorizeItem(oldName, newName, newCategory);
+        rerenderCollectionView();
+
+        const savedData = await persistAppData(buildPersistedDataPayload());
+        applyAppData(savedData);
+        rerenderCollectionView();
+        renderFromLocation();
+        closeEditItemModal();
+        showToast('Item updated on live site.');
+    } catch (error) {
+        applyAppData(snapshot);
+        rerenderCollectionView();
+        showToast(error.message || 'Failed to save item changes.', 'error');
+    } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save';
+    }
+}
+
+// =============================================================================
 // Item + Page Details
 // =============================================================================
 
@@ -585,25 +889,40 @@ function initSwipeNavigation() {
 // =============================================================================
 
 async function loadAppData() {
-    const url = document.body?.dataset?.appData || 'data/collections.json';
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to load app data: ${response.status}`);
-    return response.json();
+    const apiUrl = getApiDataUrl();
+
+    try {
+        const apiResponse = await fetch(apiUrl, { cache: 'no-store' });
+        if (apiResponse.ok) {
+            return apiResponse.json();
+        }
+    } catch (error) {
+        // Fall through to static file fallback.
+    }
+
+    const staticUrl = document.body?.dataset?.appData || 'data/collections.json';
+    const fallbackResponse = await fetch(staticUrl, { cache: 'no-store' });
+    if (!fallbackResponse.ok) {
+        throw new Error(`Failed to load app data: ${fallbackResponse.status}`);
+    }
+    return fallbackResponse.json();
 }
 
 function applyAppData(data) {
-    clothingIndex = data.all_index || {};
-    pageItems = data.all_items || {};
-    SOURCE_IMAGE_PATHS = data.source_image_paths || {};
-    SOURCE_LABELS = data.source_labels || {};
-    CATEGORY_ORDER = data.category_order || {};
-    CATEGORY_ICONS = data.category_icons || {};
+    APP_DATA = data || {};
+    clothingIndex = APP_DATA.all_index || {};
+    pageItems = APP_DATA.all_items || {};
+    SOURCE_IMAGE_PATHS = APP_DATA.source_image_paths || {};
+    SOURCE_LABELS = APP_DATA.source_labels || {};
+    CATEGORY_ORDER = APP_DATA.category_order || {};
+    CATEGORY_ICONS = APP_DATA.category_icons || {};
     DATA_READY = true;
 }
 
 function initAppAfterData() {
     buildCategoryTabs();
     initSwipeNavigation();
+    updateEditModeButton();
     renderAllItems();
     filterByCategory('all');
     filterItems('all');
@@ -611,6 +930,28 @@ function initAppAfterData() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    const editItemModal = document.getElementById('editItemModal');
+    const editItemNameInput = document.getElementById('editItemNameInput');
+    if (editItemModal) {
+        editItemModal.addEventListener('click', function(event) {
+            if (event.target === editItemModal) {
+                closeEditItemModal();
+            }
+        });
+    }
+    if (editItemNameInput) {
+        editItemNameInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                saveEditItem();
+            }
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeEditItemModal();
+            }
+        });
+    }
+
     loadAppData()
         .then(data => {
             applyAppData(data);

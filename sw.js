@@ -1,6 +1,6 @@
 /* Simple service worker to enable installability + basic offline support. */
 
-const CACHE_NAME = "brynn-outfits-static-v1";
+const CACHE_NAME = "brynn-outfits-static-v2";
 
 // Only include files that are guaranteed to exist.
 const PRECACHE_URLS = [
@@ -35,6 +35,14 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+
+  // API responses should always hit the network so live edits are immediately visible.
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(
+      fetch(req).catch(() => Response.error())
+    );
+    return;
+  }
 
   // Navigations: network-first, fallback to cached app shell.
   if (req.mode === "navigate") {
@@ -73,4 +81,3 @@ self.addEventListener("fetch", (event) => {
     })()
   );
 });
-
